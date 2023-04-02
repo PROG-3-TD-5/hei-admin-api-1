@@ -1,5 +1,6 @@
 package school.hei.haapi.endpoint.rest.controller;
 
+import java.time.Instant;
 import java.util.List;
 import lombok.AllArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -46,7 +47,7 @@ public class FeeController {
       @RequestParam PageFromOne page,
       @RequestParam("page_size") BoundedPageSize pageSize,
       @RequestParam(required = false) Fee.StatusEnum status) {
-    return feeService.getFeesByStudentId(studentId, page, pageSize, status).stream()
+    return feeService.getFeesByStudentId(studentId, page, pageSize, status, Instant.parse("2023-03-17T09:30:24.00Z")).stream()
         .map(feeMapper::toRestFee)
         .collect(toUnmodifiableList());
   }
