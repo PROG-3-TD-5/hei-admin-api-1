@@ -39,7 +39,7 @@ public class FeeService {
     private final EventProducer eventProducer;
 
     public static double interestComposeCalc(Integer initialAmount, Integer interest, Long duration) {
-        double InterestInPercent = interest / 100;
+        double InterestInPercent = ((double) interest) / 100;
         return initialAmount * Math.pow(1 + InterestInPercent, duration);
     }
 
@@ -87,26 +87,26 @@ public class FeeService {
     }
     public void applyLateFees(List<Fee> fees, DelayPenalty delayPenalty) {
         Instant now = Instant.now();
-        System.out.println("now" + now);
         Integer interestPercent = delayPenalty.getInterestPercent();
-        System.out.println("interestPercent" + interestPercent);
+        System.out.println("interestPercent: " + interestPercent);
         Integer graceDelay = delayPenalty.getGraceDelay();
-        System.out.println("graceDelay" + graceDelay);
+        System.out.println("graceDelay: " + graceDelay);
         Integer applicabilityDelayAfterGrace = delayPenalty.getApplicabilityDelayAfterGrace();
-        System.out.println("applicabilityDelayAfterGrace" + applicabilityDelayAfterGrace);
+        System.out.println("applicabilityDelayAfterGrace: " + applicabilityDelayAfterGrace);
         for (Fee fee : fees) {
             updateFeeStatus(fee);
             Instant dueDateTime = fee.getDueDatetime();
-            System.out.println("dueDateTime"+ dueDateTime);
-            if (now.isAfter(dueDateTime.plus(Duration.ofDays(graceDelay)))) {
+            if ((fee.getStatus() == LATE) && (now.isAfter(dueDateTime.plus(Duration.ofDays(graceDelay))))) {
                 Long daysLate = ChronoUnit.DAYS.between(dueDateTime, now);
-                System.out.println("daysLate"+ daysLate);
                 Long daysToApplyPenalty = Math.min(daysLate - graceDelay, applicabilityDelayAfterGrace);
-                System.out.println("daysToApplyPenalty" + daysToApplyPenalty);
+                System.out.println("daysToApplyPenalty: " + daysToApplyPenalty);
                 if (daysToApplyPenalty > 0) {
+                    System.out.println("totalAmount: " + fee.getTotalAmount());
                     double lateFeeAmount = interestComposeCalc(fee.getTotalAmount(), interestPercent, daysToApplyPenalty);
-                    fee.setTotalAmount(fee.getTotalAmount() + (int) lateFeeAmount);
-                    fee.setRemainingAmount(fee.getRemainingAmount() + (int) lateFeeAmount );
+                    System.out.println("lateFeeAmount: " + lateFeeAmount);
+                    fee.setTotalAmount((int) lateFeeAmount);
+                    fee.setRemainingAmount((int) lateFeeAmount);
+                    System.out.println("totalAmount: " + fee.getTotalAmount());
                 }
             }
         }

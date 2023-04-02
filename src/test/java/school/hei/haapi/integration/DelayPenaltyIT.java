@@ -59,6 +59,7 @@ public class DelayPenaltyIT {
         DelayPenalty actualPenalty = api.getDelayPenalty();
         assertEquals(delayPenalty1(), actualPenalty);
     }
+
     static class ContextInitializer extends AbstractContextInitializer {
         public static final int SERVER_PORT = anAvailableRandomPort();
 

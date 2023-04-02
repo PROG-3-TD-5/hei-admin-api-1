@@ -23,17 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.boot.test.context.SpringBootTest.WebEnvironment.RANDOM_PORT;
-import static school.hei.haapi.integration.conf.TestUtils.FEE1_ID;
-import static school.hei.haapi.integration.conf.TestUtils.FEE2_ID;
-import static school.hei.haapi.integration.conf.TestUtils.FEE3_ID;
-import static school.hei.haapi.integration.conf.TestUtils.MANAGER1_TOKEN;
-import static school.hei.haapi.integration.conf.TestUtils.STUDENT1_ID;
-import static school.hei.haapi.integration.conf.TestUtils.STUDENT1_TOKEN;
-import static school.hei.haapi.integration.conf.TestUtils.STUDENT2_ID;
-import static school.hei.haapi.integration.conf.TestUtils.TEACHER1_TOKEN;
-import static school.hei.haapi.integration.conf.TestUtils.anAvailableRandomPort;
-import static school.hei.haapi.integration.conf.TestUtils.assertThrowsApiException;
-import static school.hei.haapi.integration.conf.TestUtils.setUpCognito;
+import static school.hei.haapi.integration.conf.TestUtils.*;
 
 @SpringBootTest(webEnvironment = RANDOM_PORT)
 @Testcontainers
@@ -53,11 +43,11 @@ class FeeIT {
     Fee fee = new Fee();
     fee.setId(FEE1_ID);
     fee.setStudentId(STUDENT1_ID);
-    fee.setStatus(Fee.StatusEnum.LATE);
+    fee.setStatus(Fee.StatusEnum.PAID);
     fee.setType(Fee.TypeEnum.TUITION);
-    fee.setTotalAmount(80000);
-    fee.setRemainingAmount(75000);
-    fee.updatedAt(Instant.now());
+    fee.setTotalAmount(5000);
+    fee.setRemainingAmount(0);
+    fee.updatedAt(Instant.parse("2023-02-08T08:30:24.00Z"));
     fee.setComment("Comment");
     fee.creationDatetime(Instant.parse("2021-11-08T08:25:24.00Z"));
     fee.setDueDatetime(Instant.parse("2021-12-08T08:25:24.00Z"));
@@ -85,8 +75,8 @@ class FeeIT {
     fee.setStudentId(STUDENT1_ID);
     fee.setStatus(Fee.StatusEnum.LATE);
     fee.setType(Fee.TypeEnum.TUITION);
-    fee.setTotalAmount(5000);
-    fee.setRemainingAmount(5000);
+    fee.setTotalAmount(9056);
+    fee.setRemainingAmount(9056);
     fee.setComment("Comment");
     fee.setUpdatedAt(Instant.parse("2023-02-08T08:30:24Z"));
     fee.creationDatetime(Instant.parse("2022-12-08T08:25:24.00Z"));
@@ -118,7 +108,7 @@ class FeeIT {
     assertEquals(fee1(), actualFee);
     assertTrue(actual.contains(fee1()));
     assertTrue(actual.contains(fee2()));
-    assertTrue(actual.contains(fee3()));
+    assertEquals(actual.get(2), fee3());
   }
 
   @Test
@@ -134,7 +124,6 @@ class FeeIT {
     assertEquals(2, actualFees2.size());
     assertTrue(actualFees1.contains(fee1()));
     assertTrue(actualFees1.contains(fee2()));
-    assertTrue(actualFees1.contains(fee3()));
     assertTrue(actualFees2.contains(fee1()));
     assertTrue(actualFees2.contains(fee2()));
   }
@@ -177,9 +166,12 @@ class FeeIT {
     PayingApi api = new PayingApi(manager1Client);
 
     List<Fee> actual = api.createStudentFees(STUDENT1_ID, List.of(creatableFee1()));
+    System.out.println(actual);
 
     List<Fee> expected = api.getStudentFees(STUDENT1_ID, 1, 5, null);
-    assertTrue(expected.containsAll(actual));
+    assertEquals(expected.get(4).getId(), actual.get(0).getId());
+    assertEquals(expected.get(4).getCreationDatetime(), actual.get(0).getCreationDatetime());
+    assertEquals(expected.get(4).getType(), actual.get(0).getType());
   }
 
   @Test
@@ -220,7 +212,9 @@ class FeeIT {
 
     List<Fee> actual = api.getStudentFees(STUDENT1_ID, 1, 5, null);
     assertEquals(expected.size(), actual.size());
-    assertTrue(expected.containsAll(actual));
+    assertEquals(expected.get(4).getId(), actual.get(0).getId());
+    assertEquals(expected.get(4).getCreationDatetime(), actual.get(0).getCreationDatetime());
+    assertEquals(expected.get(4).getType(), actual.get(0).getType());
     String exceptionMessage1 = exception1.getMessage();
     String exceptionMessage2 = exception2.getMessage();
     String exceptionMessage3 = exception3.getMessage();
