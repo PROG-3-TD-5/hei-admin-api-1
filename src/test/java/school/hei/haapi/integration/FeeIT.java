@@ -1,6 +1,7 @@
 package school.hei.haapi.integration;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -13,10 +14,7 @@ import school.hei.haapi.SentryConf;
 import school.hei.haapi.endpoint.rest.api.PayingApi;
 import school.hei.haapi.endpoint.rest.client.ApiClient;
 import school.hei.haapi.endpoint.rest.client.ApiException;
-import school.hei.haapi.endpoint.rest.model.CreateDelayPenaltyChange;
-import school.hei.haapi.endpoint.rest.model.CreateFee;
-import school.hei.haapi.endpoint.rest.model.DelayPenalty;
-import school.hei.haapi.endpoint.rest.model.Fee;
+import school.hei.haapi.endpoint.rest.model.*;
 import school.hei.haapi.endpoint.rest.security.cognito.CognitoComponent;
 import school.hei.haapi.integration.conf.AbstractContextInitializer;
 import school.hei.haapi.integration.conf.TestUtils;
@@ -41,6 +39,22 @@ class FeeIT {
     return TestUtils.anApiClient(token, FeeIT.ContextInitializer.SERVER_PORT);
   }
 
+  static school.hei.haapi.model.User user(){
+    school.hei.haapi.model.User user = new school.hei.haapi.model.User();
+    user.setId("studentTest");
+    user.setFirstName("Test");
+    user.setLastName("Test");
+    user.setEmail("test@gmail.com");
+    user.setRef("STDTest");
+    user.setStatus(school.hei.haapi.model.User.Status.valueOf("ENABLED"));
+    user.setSex(school.hei.haapi.model.User.Sex.M);
+    user.setBirthDate(LocalDate.parse("2000-01-01"));
+    user.setPhone("0322411123");
+    user.setAddress("Adr 1");
+    user.setRole(school.hei.haapi.model.User.Role.STUDENT);
+    user.setGraceDelay(15);
+    return user;
+  }
   static Fee fee1() {
     Fee fee = new Fee();
     fee.setId(FEE1_ID);
@@ -131,6 +145,17 @@ class FeeIT {
     /*assertEquals(fee3().getTotalAmount(),actual.get(1).getTotalAmount());*/
     assertEquals(fee4().getTotalAmount(),actual.get(0).getTotalAmount());
   }
+
+  @Test
+  void student_read_with_grace_ok() throws ApiException {
+    ApiClient studentTestClient = anApiClient(STUDENTTEST_TOKEN);
+    PayingApi api = new PayingApi(studentTestClient);
+
+    List<Fee> actual = api.getStudentFees(STUDENTTEST_TOKEN, 1, 5, null);
+
+    assertEquals(fee4().getTotalAmount(),actual.get(0).getTotalAmount());
+  }
+
 
   @Test
   void manager_read_ok() throws ApiException {

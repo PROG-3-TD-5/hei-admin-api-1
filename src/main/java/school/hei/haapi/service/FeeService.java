@@ -4,6 +4,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Optional;
 import javax.transaction.Transactional;
 
 import lombok.AllArgsConstructor;
@@ -16,12 +17,10 @@ import org.springframework.stereotype.Service;
 import school.hei.haapi.endpoint.event.EventProducer;
 import school.hei.haapi.endpoint.event.model.TypedLateFeeVerified;
 import school.hei.haapi.endpoint.event.model.gen.LateFeeVerified;
-import school.hei.haapi.model.BoundedPageSize;
-import school.hei.haapi.model.DelayPenalty;
-import school.hei.haapi.model.Fee;
-import school.hei.haapi.model.PageFromOne;
+import school.hei.haapi.model.*;
 import school.hei.haapi.model.validator.FeeValidator;
 import school.hei.haapi.repository.FeeRepository;
+import school.hei.haapi.repository.UserRepository;
 
 import static org.springframework.data.domain.Sort.Direction.DESC;
 import static school.hei.haapi.endpoint.rest.model.Fee.StatusEnum.LATE;
@@ -34,6 +33,8 @@ public class FeeService {
 
     private static final school.hei.haapi.endpoint.rest.model.Fee.StatusEnum DEFAULT_STATUS = LATE;
     private final FeeRepository feeRepository;
+
+    private final UserRepository userRepository;
     private final FeeValidator feeValidator;
     private final DelayPenaltyService delayPenaltyService;
     private final EventProducer eventProducer;
@@ -78,45 +79,50 @@ public class FeeService {
                 Sort.by(DESC, "dueDatetime"));
         if (status != null) {
             List<Fee> fees = feeRepository.getFeesByStudentIdAndStatus(studentId, status, pageable);
-            applyLateFees(fees, delayPenalty, instantUpdateValue);
+            applyLateFees(fees, delayPenalty, instantUpdateValue,studentId);
             return feeRepository.getFeesByStudentIdAndStatus(studentId, status, pageable);
         }
         List<Fee> fees = feeRepository.getByStudentId(studentId, pageable);
-        applyLateFees(fees, delayPenalty, instantUpdateValue);
+        applyLateFees(fees, delayPenalty, instantUpdateValue,studentId);
         return feeRepository.getByStudentId(studentId, pageable);
     }
-    public void applyLateFees(List<Fee> fees, DelayPenalty delayPenalty, Instant instantUpdateValue) {
-        int interestRate = delayPenalty.getInterestPercent();
-        int graceDelayInDays = delayPenalty.getGraceDelay();
-        int delayApplicabilityPeriodInDays = delayPenalty.getApplicabilityDelayAfterGrace();
-        for (Fee fee : fees) {
-            Instant dueDateTime = fee.getDueDatetime();
-            Instant dayToApplyDelayPenalty = dueDateTime.plus(Duration.ofDays(graceDelayInDays));
-            if (fee.getStatus() == LATE && instantUpdateValue.isAfter(dayToApplyDelayPenalty) && (fee.getUpdatedAt().isBefore(dayToApplyDelayPenalty) || fee.getUpdatedAt().isAfter(dayToApplyDelayPenalty.plus(Duration.ofDays(delayApplicabilityPeriodInDays))))) {
-                System.out.println("Here");
-                long daysLate = ChronoUnit.DAYS.between(dueDateTime, instantUpdateValue);
-                long numberOfDaysToApplyPenalty = Math.min(daysLate - graceDelayInDays, delayApplicabilityPeriodInDays);
-                System.out.println("number of days: " + numberOfDaysToApplyPenalty);
-                if (numberOfDaysToApplyPenalty > 0) {
-                    double lateFeeAmount = calculateCompoundInterest(fee.getRemainingAmount(), interestRate, numberOfDaysToApplyPenalty);
-                    fee.setTotalAmount((int) lateFeeAmount);
-                    fee.setRemainingAmount((int) lateFeeAmount);
-                    fee.setUpdatedAt(instantUpdateValue);
-                }
-            } else if (fee.getStatus() == LATE && instantUpdateValue.isAfter(dayToApplyDelayPenalty) && fee.getUpdatedAt().isAfter(dayToApplyDelayPenalty) && fee.getUpdatedAt().isBefore(dayToApplyDelayPenalty.plus(Duration.ofDays(delayApplicabilityPeriodInDays)))) {
-                long daysLate = ChronoUnit.DAYS.between(dueDateTime, instantUpdateValue);
-                long daysBetweenUpdateAndDaytoApplyDelayPenalty = ChronoUnit.DAYS.between(dayToApplyDelayPenalty, fee.getUpdatedAt());
-                long numberOfDaysToApplyPenalty = Math.min((daysLate - graceDelayInDays) - daysBetweenUpdateAndDaytoApplyDelayPenalty, delayApplicabilityPeriodInDays - daysBetweenUpdateAndDaytoApplyDelayPenalty);
-                if (numberOfDaysToApplyPenalty > 0) {
-                    double lateFeeAmount = calculateCompoundInterest(fee.getRemainingAmount(), interestRate, numberOfDaysToApplyPenalty);
-                    fee.setTotalAmount((int) lateFeeAmount);
-                    fee.setRemainingAmount((int) lateFeeAmount);
-                    fee.setUpdatedAt(instantUpdateValue);
-                }
-            }
-        }
-        feeRepository.saveAll(fees);
-    }
+      public void applyLateFees(List<Fee> fees, DelayPenalty delayPenalty, Instant instantUpdateValue,String studentId) {
+          User actualStudent = userRepository.getById(studentId);
+          int interestRate = delayPenalty.getInterestPercent();
+          int graceDelayInDays;
+          if (actualStudent.getGraceDelay() == null) {
+              graceDelayInDays = actualStudent.getGraceDelay();
+          } else graceDelayInDays = delayPenalty.getGraceDelay();
+
+          int delayApplicabilityPeriodInDays = delayPenalty.getApplicabilityDelayAfterGrace();
+          for (Fee fee : fees) {
+              Instant dueDateTime = fee.getDueDatetime();
+              Instant dayToApplyDelayPenalty = dueDateTime.plus(Duration.ofDays(graceDelayInDays));
+              if (fee.getStatus() == LATE && instantUpdateValue.isAfter(dayToApplyDelayPenalty) && (fee.getUpdatedAt().isBefore(dayToApplyDelayPenalty) || fee.getUpdatedAt().isAfter(dayToApplyDelayPenalty.plus(Duration.ofDays(delayApplicabilityPeriodInDays))))) {
+                  System.out.println("Here");
+                  long daysLate = ChronoUnit.DAYS.between(dueDateTime, instantUpdateValue);
+                  long numberOfDaysToApplyPenalty = Math.min(daysLate - graceDelayInDays, delayApplicabilityPeriodInDays);
+                  System.out.println("number of days: " + numberOfDaysToApplyPenalty);
+                  if (numberOfDaysToApplyPenalty > 0) {
+                      double lateFeeAmount = calculateCompoundInterest(fee.getRemainingAmount(), interestRate, numberOfDaysToApplyPenalty);
+                      fee.setTotalAmount((int) lateFeeAmount);
+                      fee.setRemainingAmount((int) lateFeeAmount);
+                      fee.setUpdatedAt(instantUpdateValue);
+                  }
+              } else if (fee.getStatus() == LATE && instantUpdateValue.isAfter(dayToApplyDelayPenalty) && fee.getUpdatedAt().isAfter(dayToApplyDelayPenalty) && fee.getUpdatedAt().isBefore(dayToApplyDelayPenalty.plus(Duration.ofDays(delayApplicabilityPeriodInDays)))) {
+                  long daysLate = ChronoUnit.DAYS.between(dueDateTime, instantUpdateValue);
+                  long daysBetweenUpdateAndDaytoApplyDelayPenalty = ChronoUnit.DAYS.between(dayToApplyDelayPenalty, fee.getUpdatedAt());
+                  long numberOfDaysToApplyPenalty = Math.min((daysLate - graceDelayInDays) - daysBetweenUpdateAndDaytoApplyDelayPenalty, delayApplicabilityPeriodInDays - daysBetweenUpdateAndDaytoApplyDelayPenalty);
+                  if (numberOfDaysToApplyPenalty > 0) {
+                      double lateFeeAmount = calculateCompoundInterest(fee.getRemainingAmount(), interestRate, numberOfDaysToApplyPenalty);
+                      fee.setTotalAmount((int) lateFeeAmount);
+                      fee.setRemainingAmount((int) lateFeeAmount);
+                      fee.setUpdatedAt(instantUpdateValue);
+                  }
+              }
+          }
+          feeRepository.saveAll(fees);
+      }
 
     private Fee updateFeeStatus(Fee initialFee) {
         if (initialFee.getRemainingAmount() == 0) {

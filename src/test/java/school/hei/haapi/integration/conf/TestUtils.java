@@ -19,6 +19,7 @@ import static org.mockito.Mockito.when;
 public class TestUtils {
 
   public static final String STUDENT1_ID = "student1_id";
+  public static final String STUDENTTEST_ID = "studentTest";
   public static final String STUDENT2_ID = "student2_id";
   public static final String TEACHER1_ID = "teacher1_id";
   public static final String TEACHER2_ID = "teacher2_id";
@@ -35,6 +36,7 @@ public class TestUtils {
 
   public static final String BAD_TOKEN = "bad_token";
   public static final String STUDENT1_TOKEN = "student1_token";
+  public static final String STUDENTTEST_TOKEN = "studentTest_token";
   public static final String TEACHER1_TOKEN = "teacher1_token";
   public static final String MANAGER1_TOKEN = "manager1_token";
 
